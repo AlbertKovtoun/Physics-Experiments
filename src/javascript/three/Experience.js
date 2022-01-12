@@ -1,16 +1,12 @@
 import * as THREE from "three"
+import CANNON from "cannon"
 import Stats from "stats.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader"
 
 import { Camera } from "./Camera"
 import { Renderer } from "./Renderer"
 import { Sizes } from "./Sizes"
-
-let model
-let mixer
-let clips
-let clip
-let action
+import { Physics } from "./Physics"
 
 const stats = new Stats()
 stats.showPanel(0) // 0: fps, 1: ms, 2: mb, 3+: custom
@@ -20,25 +16,7 @@ export const canvas = document.querySelector("canvas.webgl")
 
 export const scene = new THREE.Scene()
 
-const loadingManager = new THREE.LoadingManager(() => {})
-
-const gltfLoader = new GLTFLoader(loadingManager)
-
-gltfLoader.load("/assets/Cube.gltf", (gltf) => {
-  model = gltf.scene
-
-  mixer = new THREE.AnimationMixer(gltf.scene)
-
-  // clip = THREE.AnimationClip.findByName(clips, "CubeAction")
-  action = mixer.clipAction(gltf.animations[0])
-  action.play()
-
-  // clips.forEach(function (clip) {
-  //   mixer.clipAction(clip).play()
-  // })
-
-  scene.add(model)
-})
+export const physics = new Physics()
 
 export const sizes = new Sizes()
 
@@ -48,19 +26,29 @@ export const renderer = new Renderer()
 
 //Animate
 const clock = new THREE.Clock()
-
-let time = Date.now()
+let oldElapsedTime = 0
 
 const tick = () => {
   stats.begin()
 
-  const currentTime = Date.now()
-  const deltaTime = currentTime - time
-  time = currentTime
-
   const elapsedTime = clock.getElapsedTime()
+  const deltaTime = elapsedTime - oldElapsedTime
+  oldElapsedTime = elapsedTime
 
-  if (mixer) mixer.update(0.001 * deltaTime)
+  //Update physics world
+
+  // physics.sphereBody.applyForce(
+  //   new CANNON.Vec3(-0.5, 0, 0),
+  //   physics.sphereBody.position
+  // )
+
+  physics.world.step(1 / 60, deltaTime, 3)
+
+  for (const object of physics.objectToUpdate) {
+    object.mesh.position.copy(object.body.position)
+  }
+
+  // physics.sphere.position.copy(physics.sphereBody.position)
 
   // Update controls
   camera.controls.update()
@@ -68,8 +56,9 @@ const tick = () => {
   // Render
   renderer.renderer.render(scene, camera.camera)
 
-  window.requestAnimationFrame(tick)
-  setTimeout(() => {}, 1000 / 30)
+  setTimeout(() => {
+    window.requestAnimationFrame(tick)
+  }, 1000 / 60)
 
   stats.end()
 }
